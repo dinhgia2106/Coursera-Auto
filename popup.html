@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Coursera Auto</title>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Coursera Auto</h1>
+        <p class="subtitle">by GrazT</p>
+      </header>
+
+      <section class="api-section">
+        <h2>Cài đặt API Key</h2>
+        <div class="input-group">
+          <input
+            type="password"
+            id="apiKeyInput"
+            placeholder="Nhập Gemini API Key của bạn"
+          />
+          <button id="saveApiKeyButton">Lưu</button>
+        </div>
+        <p id="apiKeyMessage" class="message"></p>
+      </section>
+
+      <section class="controls-section">
+        <h2>Điều khiển</h2>
+        <button id="startButton" class="button-primary">
+          Bắt đầu Autolearn & Autoquiz
+        </button>
+        <button id="stopButton" class="button-secondary">Dừng</button>
+      </section>
+
+      <section class="status-section">
+        <h2>Trạng thái</h2>
+        <div id="statusArea">
+          <p id="currentProcess">Chưa hoạt động</p>
+          <div class="progress-bar-container">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+          <p id="detailedStatus">-</p>
+        </div>
+        <div id="logArea" class="log-area">
+          <p><em>Log chi tiết sẽ hiển thị ở đây...</em></p>
+        </div>
+      </section>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

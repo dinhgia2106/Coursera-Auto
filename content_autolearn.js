@@ -28,7 +28,8 @@ async function applyEndedVideo(itemId, slug) {
     );
     return response.ok;
   } catch (error) {
-    console.error("Error in applyEndedVideo:", error);
+    console.error("[ContentScript-Autolearn] Error in applyEndedVideo:", error);
+    sendErrorToBackground("applyEndedVideo", error.message);
     return false;
   }
 }
@@ -68,7 +69,8 @@ async function completeReading(itemId, course_id) {
     );
     return response.ok;
   } catch (error) {
-    console.error("Error in completeReading:", error);
+    console.error("[ContentScript-Autolearn] Error in completeReading:", error);
+    sendErrorToBackground("completeReading", error.message);
     return false;
   }
 }
@@ -82,7 +84,6 @@ function getUserId() {
 
 async function getQuestionId(itemId, course_id) {
   try {
-    const currentPath = window.location.pathname;
     const response = await fetch(
       `https://www.coursera.org/api/onDemandDiscussionPrompts.v1/${getUserId()}~${course_id}~${itemId}?fields=onDemandDiscussionPromptQuestions.v1(content,creatorId,createdAt,forumId,sessionId,lastAnsweredBy,lastAnsweredAt,totalAnswerCount,topLevelAnswerCount,viewCount),promptType,question&includes=question`,
       {
@@ -112,7 +113,8 @@ async function getQuestionId(itemId, course_id) {
       "~"
     )[2];
   } catch (error) {
-    console.error("Error in getQuestionId:", error);
+    console.error("[ContentScript-Autolearn] Error in getQuestionId:", error);
+    // This error might not be critical for autolearn, so don't send to background unless necessary
     return null;
   }
 }
@@ -120,14 +122,15 @@ async function getQuestionId(itemId, course_id) {
 async function postAnswer(itemId, course_id) {
   try {
     const questionId = await getQuestionId(itemId, course_id);
-    if (!questionId) return false;
+    if (!questionId) return false; // If no questionId, it might be a video or reading, not a discussion
 
     const payload = {
       content: {
         typeName: "cml",
         definition: {
           dtdId: "discussion/1",
-          value: "<co-content><text>hi</text></co-content>",
+          value:
+            "<co-content><text>Thank you for the information!</text></co-content>", // Generic answer
         },
       },
       courseForumQuestionId: course_id + "~" + questionId,
@@ -161,7 +164,9 @@ async function postAnswer(itemId, course_id) {
     );
     return response.ok;
   } catch (error) {
-    console.error("Error in postAnswer:", error);
+    console.error("[ContentScript-Autolearn] Error in postAnswer:", error);
+    // This error might not be critical, especially if getQuestionId returned null
+    // sendErrorToBackground("postAnswer", error.message);
     return false;
   }
 }
@@ -190,76 +195,167 @@ async function getMaterialCourse(slug) {
 
     const data = await response.json();
     let allItems = [];
-    if (response.ok) {
+    if (
+      response.ok &&
+      data.linked &&
+      data.linked["onDemandCourseMaterialLessons.v1"]
+    ) {
       data.linked["onDemandCourseMaterialLessons.v1"].forEach((lesson) => {
         allItems = [...allItems, ...lesson.itemIds];
       });
       return { items: allItems, course_id: data.elements[0].id };
     }
+    sendErrorToBackground(
+      "getMaterialCourse",
+      "Không thể lấy danh sách bài học hoặc cấu trúc dữ liệu API thay đổi."
+    );
     return null;
   } catch (error) {
-    console.error("Error in getMaterialCourse:", error);
+    console.error(
+      "[ContentScript-Autolearn] Error in getMaterialCourse:",
+      error
+    );
+    sendErrorToBackground("getMaterialCourse", error.message);
     return null;
   }
 }
 
-let done = false;
-const slug = window.location.pathname.split("/")[2];
+let stopScript = false;
 
-async function processItemsWithTimeout(material) {
-  if (!material) {
-    alert("Failed to get course materials");
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "STOP_SCRIPT") {
+    console.log("[ContentScript-Autolearn] Received STOP_SCRIPT command.");
+    stopScript = true;
+    sendResponse({ status: "Stopping Autolearn" });
+  }
+  return true; // Keep the message channel open for asynchronous response
+});
+
+function sendProgressToBackground(
+  completedItems,
+  totalItems,
+  currentItemName = "N/A"
+) {
+  const progress =
+    totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+  chrome.runtime.sendMessage({
+    type: "AUTOLERN_PROGRESS",
+    progress: progress,
+    status: `Đã xử lý ${completedItems}/${totalItems} items. Hiện tại: ${currentItemName}`,
+    currentTask: `Item ${completedItems}/${totalItems}`,
+  });
+}
+
+function sendErrorToBackground(stage, errorMsg) {
+  console.error(`[ContentScript-Autolearn] Error at ${stage}: ${errorMsg}`);
+  chrome.runtime.sendMessage({
+    type: "PROCESS_ERROR",
+    stage: "autolearn",
+    error: `Lỗi tại ${stage}: ${errorMsg}`,
+  });
+}
+
+async function processItemsWithTimeout(material, slug) {
+  if (!material || !material.items || material.items.length === 0) {
+    const errorMsg =
+      "Không tìm thấy tài liệu khóa học hoặc không có item nào để xử lý.";
+    console.error("[ContentScript-Autolearn]", errorMsg);
+    sendErrorToBackground("processItemsWithTimeout", errorMsg);
+    chrome.runtime.sendMessage({ type: "AUTOLERN_DONE" }); // Notify completion even on error to proceed or stop
     return;
   }
 
   const totalItems = material.items.length;
   let completedItems = 0;
+  console.log(`[ContentScript-Autolearn] Bắt đầu xử lý ${totalItems} items.`);
+  sendProgressToBackground(completedItems, totalItems, "Bắt đầu");
 
-  return new Promise((resolve) => {
-    material.items.forEach((item, index) => {
-      // Generate random delay between 1-3 seconds (1000-3000ms)
-      const randomDelay = (Math.floor(Math.random() * 2000) + 500) * 0.3;
+  for (let i = 0; i < totalItems; i++) {
+    if (stopScript) {
+      console.log("[ContentScript-Autolearn] Dừng xử lý do yêu cầu.");
+      sendProgressToBackground(completedItems, totalItems, "Đã dừng");
+      // Không gửi AUTOLERN_DONE ở đây, background sẽ xử lý trạng thái dừng
+      return;
+    }
 
-      setTimeout(async () => {
-        try {
-          await completeReading(item, material.course_id);
-          await postAnswer(item, material.course_id);
-          await applyEndedVideo(item, slug);
+    const item = material.items[i];
+    const randomDelay = (Math.floor(Math.random() * 2000) + 500) * 0.3; // Delay đã giảm
 
-          completedItems++;
-          console.log(
-            `Processed item ${completedItems}/${totalItems} (delay: ${randomDelay}ms)`
-          );
+    try {
+      // Cố gắng lấy tên item để log đẹp hơn (nếu có, không thì dùng ID)
+      // Đây là một ví dụ, bạn cần điều chỉnh dựa trên cấu trúc data.linked['onDemandCourseMaterialItems.v2']
+      // const itemDetails = material.course_items_details?.find(it => it.id === item);
+      // const itemName = itemDetails ? itemDetails.name : item;
+      const itemName = item; // Tạm thời dùng item ID
 
-          if (completedItems === totalItems) {
-            resolve();
-          }
-        } catch (error) {
-          console.error(`Error processing item ${item}:`, error);
-          completedItems++;
-          if (completedItems === totalItems) {
-            resolve();
-          }
-        }
-      }, index * randomDelay); // Random delay between 1-3 seconds
-    });
-  });
+      console.log(
+        `[ContentScript-Autolearn] Đang xử lý item ${
+          i + 1
+        }/${totalItems}: ${itemName} (delay: ${randomDelay}ms)`
+      );
+      sendProgressToBackground(completedItems, totalItems, itemName);
+
+      await completeReading(item, material.course_id);
+      await postAnswer(item, material.course_id); // Có thể thất bại nếu không phải discussion
+      await applyEndedVideo(item, slug);
+
+      completedItems++;
+      console.log(
+        `[ContentScript-Autolearn] Hoàn thành item ${completedItems}/${totalItems}: ${itemName}`
+      );
+      sendProgressToBackground(completedItems, totalItems, itemName);
+
+      if (i < totalItems - 1) {
+        // Chỉ delay nếu không phải item cuối
+        await new Promise((resolve) => setTimeout(resolve, randomDelay));
+      }
+    } catch (error) {
+      console.error(
+        `[ContentScript-Autolearn] Lỗi khi xử lý item ${item}:`,
+        error
+      );
+      sendErrorToBackground(`processing item ${item}`, error.message);
+      // Có thể quyết định dừng hẳn hoặc bỏ qua item lỗi và tiếp tục
+      // Hiện tại: bỏ qua và tiếp tục
+      completedItems++; // Vẫn tăng để tiến trình không bị kẹt
+      sendProgressToBackground(completedItems, totalItems, `Lỗi với ${item}`);
+    }
+  }
+  if (!stopScript) {
+    console.log("[ContentScript-Autolearn] Tất cả các items đã được xử lý.");
+    chrome.runtime.sendMessage({ type: "AUTOLERN_DONE" });
+  }
 }
 
-// Main execution
+// Main execution for content_autolearn.js
 (async () => {
+  console.log("[ContentScript-Autolearn] Script đang chạy...");
+  const slug = window.location.pathname.split("/")[2];
+  if (!slug) {
+    sendErrorToBackground("initialization", "Không thể lấy slug từ URL.");
+    chrome.runtime.sendMessage({ type: "AUTOLERN_DONE" }); // Để không bị kẹt
+    return;
+  }
+
   try {
     const material = await getMaterialCourse(slug);
-    if (material) {
-      console.log(`Found ${material.items.length} items to process`);
-      await processItemsWithTimeout(material);
-      done = true;
-      alert("All items have been processed successfully!");
+    if (material && material.items) {
+      console.log(
+        `[ContentScript-Autolearn] Tìm thấy ${material.items.length} items để xử lý cho slug: ${slug}`
+      );
+      await processItemsWithTimeout(material, slug);
     } else {
-      alert("Failed to get course materials");
+      const msg = `Không lấy được tài liệu khóa học cho slug: ${slug}. Có thể bạn không ở trang khóa học chính.`;
+      console.warn("[ContentScript-Autolearn]", msg);
+      sendErrorToBackground("getMaterialCourse", msg);
+      chrome.runtime.sendMessage({ type: "AUTOLERN_DONE" }); // Để không bị kẹt
     }
   } catch (error) {
-    console.error("An error occurred:", error);
-    alert("An error occurred while processing the course");
+    console.error(
+      "[ContentScript-Autolearn] Lỗi nghiêm trọng trong quá trình thực thi chính:",
+      error
+    );
+    sendErrorToBackground("main execution", error.message);
+    chrome.runtime.sendMessage({ type: "AUTOLERN_DONE" }); // Để không bị kẹt
   }
 })();
