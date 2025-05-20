@@ -1,10 +1,10 @@
 {
-  "manifest_version": 3,
-  "name": "Coursera Auto Extension by GrazT",
+  "name": "Coursera Auto Learn & Quiz",
   "version": "1.0",
-  "description": "Tự động hóa việc học và làm quiz trên Coursera.",
-  "permissions": ["activeTab", "storage", "scripting", "tabs"],
-  "host_permissions": ["https://www.coursera.org/*"],
+  "description": "Tự động học và làm quiz trên Coursera",
+  "manifest_version": 3,
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": ["*://*.coursera.org/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -16,6 +16,18 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["*://*.coursera.org/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["quiz_handler.js"],
+      "matches": ["*://*.coursera.org/*"]
+    }
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

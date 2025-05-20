@@ -1,52 +1,213 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Coursera Auto</title>
+    <title>Coursera Auto Learn & Quiz</title>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        width: 350px;
+        margin: 0;
+        padding: 0;
+        background-color: #f5f7f9;
+        color: #2a2f45;
+      }
+
+      .container {
+        padding: 20px;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #e1e4e8;
+      }
+
+      .header h1 {
+        margin: 0;
+        color: #0056d2; /* Coursera blue */
+        font-size: 22px;
+        font-weight: 600;
+      }
+
+      .header p {
+        margin: 5px 0 0;
+        font-size: 14px;
+        color: #6b7280;
+      }
+
+      .input-group {
+        margin-bottom: 20px;
+      }
+
+      .input-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      .input-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      .input-container input {
+        flex: 1;
+        padding: 10px 12px;
+        font-size: 14px;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        width: 100%;
+        box-sizing: border-box;
+        transition: border-color 0.3s;
+      }
+
+      .input-container input:focus {
+        outline: none;
+        border-color: #0056d2;
+      }
+
+      .toggle-visibility {
+        position: absolute;
+        right: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #6b7280;
+      }
+
+      .toggle-visibility:hover {
+        color: #0056d2;
+      }
+
+      .buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .btn {
+        padding: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+      }
+
+      .btn i {
+        margin-right: 8px;
+      }
+
+      .btn-learn {
+        background-color: #0056d2; /* Coursera blue */
+        color: white;
+      }
+
+      .btn-learn:hover {
+        background-color: #004bb9;
+      }
+
+      .btn-quiz {
+        background-color: #34a853; /* Green */
+        color: white;
+      }
+
+      .btn-quiz:hover {
+        background-color: #2d9348;
+      }
+
+      .save-btn {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        margin-top: 5px;
+        background-color: #0056d2;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      .save-btn:hover {
+        background-color: #004bb9;
+      }
+
+      .status {
+        margin-top: 15px;
+        font-size: 13px;
+        text-align: center;
+        padding: 10px;
+        border-radius: 6px;
+        background-color: #e1e4e8;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .status.show {
+        opacity: 1;
+      }
+
+      .status.success {
+        background-color: #d1f7dd;
+        color: #0f5132;
+      }
+
+      .status.error {
+        background-color: #f8d7da;
+        color: #842029;
+      }
+    </style>
   </head>
   <body>
     <div class="container">
-      <header>
-        <h1>Coursera Auto</h1>
-        <p class="subtitle">by GrazT</p>
-      </header>
+      <div class="header">
+        <h1>Coursera Auto Learn & Quiz</h1>
+        <p>Tự động học và làm quiz trên Coursera</p>
+      </div>
 
-      <section class="api-section">
-        <h2>Cài đặt API Key</h2>
-        <div class="input-group">
+      <div class="input-group">
+        <label for="api-key">API Key (Gemini)</label>
+        <div class="input-container">
           <input
             type="password"
-            id="apiKeyInput"
-            placeholder="Nhập Gemini API Key của bạn"
+            id="api-key"
+            placeholder="Nhập API key của bạn"
           />
-          <button id="saveApiKeyButton">Lưu</button>
+          <button class="toggle-visibility" id="toggle-visibility">
+            <i class="fa-regular fa-eye"></i>
+          </button>
         </div>
-        <p id="apiKeyMessage" class="message"></p>
-      </section>
+        <button class="save-btn" id="save-api-key">Lưu API Key</button>
+      </div>
 
-      <section class="controls-section">
-        <h2>Điều khiển</h2>
-        <button id="startButton" class="button-primary">
-          Bắt đầu Autolearn & Autoquiz
+      <div class="buttons">
+        <button class="btn btn-learn" id="auto-learn">
+          <i class="fa-solid fa-graduation-cap"></i>
+          Auto Learn
         </button>
-        <button id="stopButton" class="button-secondary">Dừng</button>
-      </section>
+        <button class="btn btn-quiz" id="auto-quiz">
+          <i class="fa-solid fa-clipboard-check"></i>
+          Auto Quiz
+        </button>
+      </div>
 
-      <section class="status-section">
-        <h2>Trạng thái</h2>
-        <div id="statusArea">
-          <p id="currentProcess">Chưa hoạt động</p>
-          <div class="progress-bar-container">
-            <div id="progressBar" class="progress-bar"></div>
-          </div>
-          <p id="detailedStatus">-</p>
-        </div>
-        <div id="logArea" class="log-area">
-          <p><em>Log chi tiết sẽ hiển thị ở đây...</em></p>
-        </div>
-      </section>
+      <div class="status" id="status">Đang chờ thao tác...</div>
     </div>
+
     <script src="popup.js"></script>
   </body>
 </html>
